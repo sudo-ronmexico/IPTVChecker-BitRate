@@ -58,7 +58,11 @@ def check_channel_status(url, timeout, retries=6, extended_timeout=None):
                         content_type = resp.headers.get('Content-Type', '')
                         logging.debug(f"Content-Type: {content_type}")
 
-                        if 'video/mp2t' in content_type or '.ts' in url or 'application/vnd.apple.mpegurl' in content_type:
+                        # ----- FIXED CONTENT-TYPE CHECK -----
+                        if ('video/mp2t' in content_type 
+                            or '.ts' in url 
+                            or 'application/vnd.apple.mpegurl' in content_type
+                            or 'application/x-mpegurl' in content_type.lower()):
                             for chunk in resp.iter_content(1024 * 1024):  # 1MB chunks
                                 if not chunk:
                                     stable_connection = False
@@ -116,7 +120,6 @@ def check_channel_status(url, timeout, retries=6, extended_timeout=None):
 
     return status
 
-
 def capture_frame(url, output_path, file_name):
     command = [
         'ffmpeg', '-y', '-i', url, '-ss', '00:00:02', '-frames:v', '1',
@@ -129,7 +132,6 @@ def capture_frame(url, output_path, file_name):
     except subprocess.TimeoutExpired:
         logging.error(f"Timeout when trying to capture frame for {file_name}")
         return False
-
 
 def get_stream_info(url):
     command = [
@@ -393,7 +395,6 @@ def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout,
         logging.error(f"File not found: {file_path}. Please check the path and try again.")
     except Exception as e:
         logging.error(f"An unexpected error occurred while processing the file: {str(e)}")
-
 
 def main():
     print_header()
