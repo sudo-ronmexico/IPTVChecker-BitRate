@@ -1,7 +1,5 @@
 # IPTV Stream Checker
 
-![IPTV Stream Checker](https://img.shields.io/badge/IPTV%20Checker-v1.0-blue.svg) ![Python](https://img.shields.io/badge/Python-3.6%2B-brightgreen.svg) ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
-
 ## Overview
 
 IPTV Stream Checker is a command-line tool originally by <a href="https://github.com/NewsGuyTor/IPTVChecker">NewsGuyTor</a> designed to check the status of channels in an IPTV M3U8 playlist. It verifies if the streams are alive, captures screenshots, provides detailed information about video and audio streams, and identifies any potential issues like low framerates or mislabeled channels. 
