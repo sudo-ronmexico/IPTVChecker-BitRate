@@ -4,9 +4,9 @@
 
 ## Overview
 
-IPTV Stream Checker is a command-line tool designed to check the status of channels in an IPTV M3U8 playlist. It verifies if the streams are alive, captures screenshots, provides detailed information about video and audio streams, and identifies any potential issues like low framerates or mislabeled channels.
+IPTV Stream Checker is a command-line tool designed to check the status of channels in an IPTV M3U8 playlist. It verifies if the streams are alive, captures screenshots, provides detailed information about video and audio streams, and identifies any potential issues like low framerates or mislabeled channels. It also has additions by Ron Mexico to include bitrate on channels utilizing ffmpeg to profile a channel over 10 seconds to capture an average variable bit-rate (VBR). 
 
-<img width="794" alt="screenshot" src="https://github.com/user-attachments/assets/ffa84de1-f644-44b5-9d7d-92e32652a2be">
+<img width="794" alt="screenshot" src="https://i.imgur.com/y1beux6.png">
 
 ## Features
 
@@ -17,7 +17,9 @@ IPTV Stream Checker is a command-line tool designed to check the status of chann
 - **Detailed Stream Info:** Retrieve and display video codec, resolution, framerate, and audio bitrate.
 - **Low Framerate Detection:** Identifies and lists channels with framerates at 30fps or below.
 - **Mislabeled Channel Detection:** Detects channels with resolutions that do not match their labels (e.g., "1080p" labeled as "4K").
-- **Custom User-Agent:** Uses `IPTVChecker 1.0` as the user agent for HTTP requests.
+- **Custom User-Agent:** Ron Mexico's version uses VLC as the user agent for HTTP requests.
+- **BitRate Average Calculator:** Added by Ron Mexico, this will now profile and add an average of the variable bit-rate of the channel (VBR) utilizing ffmpeg to profile it over 10 seconds.
+  
 
 ## Installation
 
@@ -29,8 +31,8 @@ IPTV Stream Checker is a command-line tool designed to check the status of chann
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/NewsGuyTor/IPTVChecker.git
-cd IPTVChecker
+git clone https://github.com/sudo-ronmexico/IPTVChecker-BitRate.git 
+cd IPTVChecker-BitRate 
 ```
 
 ### Install Dependencies
