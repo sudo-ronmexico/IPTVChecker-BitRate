@@ -22,6 +22,55 @@ def print_header():
     print("\033[93mWelcome to the IPTV Stream Checker!\n\033[0m")
     print("\033[93mUse -h for help on how to use this tool.\033[0m")
 
+import subprocess
+import logging
+
+
+
+def get_video_bitrate(url):
+    # Command to capture 10 seconds of the video stream with VLC user-agent
+    command = [
+        'ffmpeg', '-v', 'debug', '-user_agent', 'VLC/3.0.14', '-i', url, 
+        '-t', '10', '-f', 'null', '-'
+    ]
+    
+    try:
+        # Run the command and capture stderr where bitrate data might be logged
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+
+        # Read the stderr output for total bytes downloaded
+        output = result.stderr.decode()
+
+        # Print the raw stderr to debug what's coming from ffmpeg (direct to console)
+#        print(f"FFmpeg stderr output:\n{output}")
+        
+        # Extract total bytes transferred during the capture period
+        total_bytes = 0
+        for line in output.splitlines():
+            if "Statistics:" in line:  # Look for the line with "Statistics:" that contains bytes read
+                # Example: [AVIOContext @ 0x563835cf7540] Statistics: 4577324 bytes read, 0 seeks
+                if "bytes read" in line:
+                    # Extract the number of bytes before the "bytes read"
+                    parts = line.split("bytes read")
+                    size_str = parts[0].strip().split()[-1]  # The last part before "bytes read"
+                    if size_str.isdigit():
+                        total_bytes = int(size_str)
+                        break
+        
+        if total_bytes == 0:
+            return "N/A"
+
+        # Calculate bitrate (bytes to kilobits: multiply by 8, then divide by 1000 for kbps)
+        bitrate_kbps = (total_bytes * 8) / 1000 / 10  # Dividing by 10 for 10 seconds of data
+        return f"{round(bitrate_kbps)} kbps"
+    
+    except subprocess.TimeoutExpired:
+        logging.error(f"Timeout when trying to get video bitrate for {url}")
+        return "Unknown"
+    except Exception as e:
+        logging.error(f"Error when attempting to retrieve video bitrate: {e}")
+        return "N/A"
+
 def setup_logging(verbose_level):
     if verbose_level == 1:
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -36,12 +85,12 @@ def handle_sigint(signum, frame):
 
 signal.signal(signal.SIGINT, handle_sigint)
 
-def check_channel_status(url, timeout, retries=6, extended_timeout=None):
+def check_channel_status(url, timeout, retries=8, extended_timeout=None):
     headers = {
-        'User-Agent': 'IPTVChecker 1.0'
+        'User-Agent': 'VLC/3.0.14 LibVLC/3.0.14'
     }
     min_data_threshold = 1024 * 500  # 500KB minimum threshold
-    initial_timeout = 5
+    initial_timeout = 15
     max_timeout = timeout
 
     def attempt_check(current_timeout):
@@ -135,7 +184,7 @@ def capture_frame(url, output_path, file_name):
 
 def get_stream_info(url):
     command = [
-        'ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 
+        'ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries',
         'stream=codec_name,width,height,r_frame_rate', '-of', 'default=noprint_wrappers=1', url
     ]
     try:
@@ -170,11 +219,13 @@ def get_stream_info(url):
                 resolution = "SD"
 
         resolution_fps = f"{resolution}{fps}" if resolution != "Unknown" and fps else resolution
+        video_bitrate = get_video_bitrate(url)
 
-        return f"{resolution_fps} {codec_name}" if codec_name and resolution_fps else "Unknown", resolution, fps
+        return f"{resolution_fps} {codec_name} | Video: {video_bitrate}", resolution, fps
     except subprocess.TimeoutExpired:
         logging.error(f"Timeout when trying to get stream info for {url}")
         return "Unknown", "Unknown", None
+
 
 def get_audio_bitrate(url):
     command = [
@@ -251,12 +302,12 @@ def console_log_entry(current_channel, total_channels, channel_name, status, vid
         logging.info(f"{current_channel}/{total_channels} {status_symbol} {channel_name}{name_padding} | Video: {video_info} - Audio: {audio_info}")
     else:
         if use_padding:
-            # Include the | for dead links only when padding is added
             print(f"{color}{current_channel}/{total_channels} {status_symbol} {channel_name}{name_padding} |\033[0m")
             logging.info(f"{current_channel}/{total_channels} {status_symbol} {channel_name}{name_padding} |")
         else:
             print(f"{color}{current_channel}/{total_channels} {status_symbol} {channel_name}\033[0m")
             logging.info(f"{current_channel}/{total_channels} {status_symbol} {channel_name}")
+
 
 def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout, split=False, rename=False):
     base_playlist_name = os.path.basename(file_path).split('.')[0]
@@ -323,7 +374,7 @@ def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout,
                                     mislabeled_channels.append(f"{current_channel}/{total_channels} {channel_name} - \033[91m{', '.join(mismatches)}\033[0m")
                                 file_name = f"{current_channel}-{channel_name.replace('/', '-')}"  # Replace '/' to avoid path issues
                                 capture_frame(next_line, output_folder, file_name)
-                                
+
                                 if rename:
                                     # Create the new channel name in the desired format
                                     renamed_channel_name = f"{channel_name} ({resolution} {video_info.split()[-1]} | {audio_info})"
@@ -337,6 +388,7 @@ def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout,
                             else:
                                 if split:
                                     dead_channels.append((line, next_line))
+                            # Ensure it only prints the channel info once per loop
                             console_log_entry(current_channel, total_channels, channel_name, status, video_info, audio_info, max_name_length, use_padding)
                             processed_channels.add(identifier)
 
@@ -425,3 +477,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
