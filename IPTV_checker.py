@@ -8,6 +8,7 @@ import subprocess
 import logging
 import shutil
 import codecs
+import re
 
 def print_header():
     header_text = """
@@ -229,7 +230,7 @@ def get_detailed_stream_info(url):
 
     except subprocess.TimeoutExpired:
         logging.error(f"Timeout when trying to get stream info for {url}")
-        return "Unknown", "Unknown", None
+        return "Unknown", "Unknown", "Unknown", None
 
 def get_audio_bitrate(url):
     command = [
@@ -318,7 +319,7 @@ def file_log_entry(f_output, current_channel, total_channels, channel_name, stat
     logging.debug(f"{current_channel}|{total_channels}|{status}|{channel_name}|{codec_name}|{video_bitrate}|{resolution}|{fps}|{audio_info}")
 
     
-def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout, split=False, rename=False, skip_screenshots=False, output_file=None):
+def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout, split=False, rename=False, skip_screenshots=False, output_file=None, channel_search=None):
     base_playlist_name = os.path.basename(file_path).split('.')[0]
     group_name = group_title.replace('|', '').replace(' ', '') if group_title else 'AllGroups'
     if not skip_screenshots:
@@ -370,11 +371,17 @@ def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout,
             else:
                 use_padding = True
 
+            pattern = None
+            if channel_search:
+                pattern = re.compile(channel_search, flags=re.IGNORECASE)
+            else:
+                pattern = re.compile(".*", flags=re.DOTALL)
+
             renamed_lines = []
             i = 0
             while i < len(lines):
                 line = lines[i].strip()
-                if line.startswith('#EXTINF') and (group_title in line if group_title else True):
+                if line.startswith('#EXTINF') and (group_title in line if group_title else True) and (pattern.search(channel_name) if not pattern else True):
                     if i + 1 < len(lines):
                         next_line = lines[i + 1].strip()
                         channel_name = line.split(',', 1)[1].strip() if ',' in line else "Unknown Channel"
@@ -485,6 +492,7 @@ def main():
     parser = argparse.ArgumentParser(description="Check the status of channels in an IPTV M3U8 playlist and capture frames of live channels.")
     parser.add_argument("playlist", type=str, help="Path to the M3U8 playlist file")
     parser.add_argument("-group", "-g", type=str, default=None, help="Specific group title to check within the playlist")
+    parser.add_argument("-channel_search", "-c", type=str, default=None, help="Specific search term to match channel names. Case Unsensitive.")
     parser.add_argument("-output", "-o", type=str, default=None, help="Output file path e.g. ~/output/results.csv")
     parser.add_argument("-timeout", "-t", type=float, default=10.0, help="Timeout in seconds for checking channel status")
     parser.add_argument("-v", action="count", default=0, help="Increase output verbosity (-v for info, -vv for debug)")
@@ -507,7 +515,7 @@ def main():
     group_name = args.group.replace('|', '').replace(' ', '') if args.group else 'AllGroups'
     log_file_name = f"{os.path.basename(args.playlist).split('.')[0]}_{group_name}_checklog.txt"
 
-    parse_m3u8_file(args.playlist, args.group, args.timeout, log_file_name, extended_timeout=args.extended, split=args.split, rename=args.rename, skip_screenshots=args.skip_screenshots, output_file=args.output)
+    parse_m3u8_file(args.playlist, args.group, args.timeout, log_file_name, extended_timeout=args.extended, split=args.split, rename=args.rename, skip_screenshots=args.skip_screenshots, output_file=args.output, channel_search=args.channel_search)
 
 if __name__ == "__main__":
     main()
