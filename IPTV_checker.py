@@ -229,7 +229,7 @@ def get_detailed_stream_info(url):
 
     except subprocess.TimeoutExpired:
         logging.error(f"Timeout when trying to get stream info for {url}")
-        return "Unknown", "Unknown", None
+        return "Unknown", "Unknown", "Unknown", None
 
 def get_audio_bitrate(url):
     command = [
