@@ -7,6 +7,7 @@ import time
 import subprocess
 import logging
 import shutil
+import codecs
 
 def print_header():
     header_text = """
@@ -182,7 +183,12 @@ def capture_frame(url, output_path, file_name):
         logging.error(f"Timeout when trying to capture frame for {file_name}")
         return False
 
-def get_stream_info(url):
+def get_stream_info(codec_name, video_bitrate, resolution, fps):
+        resolution_fps = f"{resolution}{fps}" if resolution != "Unknown" and fps else resolution
+        return f"{resolution_fps} {codec_name} | Video: {video_bitrate}", resolution, fps
+   
+
+def get_detailed_stream_info(url):
     command = [
         'ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries',
         'stream=codec_name,width,height,r_frame_rate', '-of', 'default=noprint_wrappers=1', url
@@ -217,15 +223,13 @@ def get_stream_info(url):
                 resolution = "720p"
             else:
                 resolution = "SD"
-
-        resolution_fps = f"{resolution}{fps}" if resolution != "Unknown" and fps else resolution
         video_bitrate = get_video_bitrate(url)
+        
+        return codec_name, video_bitrate, resolution, fps
 
-        return f"{resolution_fps} {codec_name} | Video: {video_bitrate}", resolution, fps
     except subprocess.TimeoutExpired:
         logging.error(f"Timeout when trying to get stream info for {url}")
         return "Unknown", "Unknown", None
-
 
 def get_audio_bitrate(url):
     command = [
@@ -299,28 +303,43 @@ def console_log_entry(current_channel, total_channels, channel_name, status, vid
         name_padding = ''
     if status == 'Alive':
         print(f"{color}{current_channel}/{total_channels} {status_symbol} {channel_name}{name_padding} | Video: {video_info} - Audio: {audio_info}\033[0m")
-        logging.info(f"{current_channel}/{total_channels} {status_symbol} {channel_name}{name_padding} | Video: {video_info} - Audio: {audio_info}")
+        logging.debug(f"{current_channel}/{total_channels} {status_symbol} {channel_name}{name_padding} | Video: {video_info} - Audio: {audio_info}")
     else:
         if use_padding:
             print(f"{color}{current_channel}/{total_channels} {status_symbol} {channel_name}{name_padding} |\033[0m")
-            logging.info(f"{current_channel}/{total_channels} {status_symbol} {channel_name}{name_padding} |")
+            logging.debug(f"{current_channel}/{total_channels} {status_symbol} {channel_name}{name_padding} |")
         else:
             print(f"{color}{current_channel}/{total_channels} {status_symbol} {channel_name}\033[0m")
-            logging.info(f"{current_channel}/{total_channels} {status_symbol} {channel_name}")
+            logging.debug(f"{current_channel}/{total_channels} {status_symbol} {channel_name}")
 
 
-def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout, split=False, rename=False):
+def file_log_entry(f_output, current_channel, total_channels, channel_name, status, codec_name, video_bitrate, resolution, fps, audio_info):
+    f_output.write(f"{current_channel},{total_channels},{status},\"{channel_name}\",{codec_name},{video_bitrate},{resolution},{fps},{audio_info}\n")
+    logging.debug(f"{current_channel}|{total_channels}|{status}|{channel_name}|{codec_name}|{video_bitrate}|{resolution}|{fps}|{audio_info}")
+
+    
+def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout, split=False, rename=False, skip_screenshots=False, output_file=None):
     base_playlist_name = os.path.basename(file_path).split('.')[0]
     group_name = group_title.replace('|', '').replace(' ', '') if group_title else 'AllGroups'
-    output_folder = f"{base_playlist_name}_{group_name}_screenshots"
-    os.makedirs(output_folder, exist_ok=True)
+    if not skip_screenshots:
+        output_folder = f"{base_playlist_name}_{group_name}_screenshots"
+        logging.info(f"Will take screenshots and store at {output_folder}") 
+        os.makedirs(output_folder, exist_ok=True)
+    else:
+        logging.info(f"Will skip taking screenshots")
+
+    if output_file:
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        logging.info(f"will output results to {output_file}")        
+        f_output = codecs.open(output_file, "w", "utf-8-sig")  
+        f_output.write("Number,Total,Status,Name,Codec,Bit Rate,Resolution,Frame Rate,Audio\n")      
 
     processed_channels, last_index = load_processed_channels(log_file)
     current_channel = last_index
     mislabeled_channels = []
     low_framerate_channels = []
     max_name_length = 0
-    use_padding = True
+
 
     working_channels = []
     dead_channels = []
@@ -348,6 +367,8 @@ def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout,
             max_line_length = max_name_length + len("1/5 ✓ | Video: 1080p50 H264 - Audio: 160 kbps AAC") + 3  # 3 for extra padding
             if max_line_length > console_width:
                 use_padding = False
+            else:
+                use_padding = True
 
             renamed_lines = []
             i = 0
@@ -365,15 +386,18 @@ def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout,
                             audio_info = "Unknown"
                             fps = None
                             if status == 'Alive':
-                                video_info, resolution, fps = get_stream_info(next_line)
+                                codec_name, video_bitrate, resolution, fps = get_detailed_stream_info(next_line)
+                                video_info, resolution, fps = get_stream_info(codec_name, video_bitrate, resolution, fps)
                                 audio_info = get_audio_bitrate(next_line)
                                 mismatches = check_label_mismatch(channel_name, resolution)
                                 if fps is not None and fps <= 30:
                                     low_framerate_channels.append(f"{current_channel}/{total_channels} {channel_name} - \033[91m{fps}fps\033[0m")
                                 if mismatches:
                                     mislabeled_channels.append(f"{current_channel}/{total_channels} {channel_name} - \033[91m{', '.join(mismatches)}\033[0m")
-                                file_name = f"{current_channel}-{channel_name.replace('/', '-')}"  # Replace '/' to avoid path issues
-                                capture_frame(next_line, output_folder, file_name)
+                                
+                                if not skip_screenshots:
+                                    file_name = f"{current_channel}-{channel_name.replace('/', '-')}"  # Replace '/' to avoid path issues
+                                    capture_frame(next_line, output_folder, file_name)
 
                                 if rename:
                                     # Create the new channel name in the desired format
@@ -388,8 +412,12 @@ def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout,
                             else:
                                 if split:
                                     dead_channels.append((line, next_line))
+                            
                             # Ensure it only prints the channel info once per loop
+                            if output_file:
+                                file_log_entry(f_output, current_channel, total_channels, channel_name, status, codec_name, video_bitrate, resolution, fps, audio_info)
                             console_log_entry(current_channel, total_channels, channel_name, status, video_info, audio_info, max_name_length, use_padding)
+                            
                             processed_channels.add(identifier)
 
                         # Add the processed (renamed) line and the corresponding URL to the list
@@ -403,6 +431,9 @@ def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout,
                     # If it's not an EXTINF line, just keep it as is
                     renamed_lines.append(line)
                 i += 1
+
+            #close output file
+            f_output.close()
 
             if split:
                 working_playlist_path = f"{base_playlist_name}_working.m3u8"
@@ -454,11 +485,14 @@ def main():
     parser = argparse.ArgumentParser(description="Check the status of channels in an IPTV M3U8 playlist and capture frames of live channels.")
     parser.add_argument("playlist", type=str, help="Path to the M3U8 playlist file")
     parser.add_argument("-group", "-g", type=str, default=None, help="Specific group title to check within the playlist")
+    parser.add_argument("-output", "-o", type=str, default=None, help="Output file path e.g. ~/output/results.csv")
     parser.add_argument("-timeout", "-t", type=float, default=10.0, help="Timeout in seconds for checking channel status")
     parser.add_argument("-v", action="count", default=0, help="Increase output verbosity (-v for info, -vv for debug)")
     parser.add_argument("-extended", "-e", type=int, nargs='?', const=10, default=None, help="Enable extended timeout check for dead channels. Default is 10 seconds if used without specifying time.")
     parser.add_argument("-split", "-s", action="store_true", help="Create separate playlists for working and dead channels")
     parser.add_argument("-rename", "-r", action="store_true", help="Rename alive channels to include video and audio info")
+    parser.add_argument("-skip_screenshots", action="store_true", help="Skip capturing screenshots")
+    
 
     args = parser.parse_args()
 
@@ -473,7 +507,7 @@ def main():
     group_name = args.group.replace('|', '').replace(' ', '') if args.group else 'AllGroups'
     log_file_name = f"{os.path.basename(args.playlist).split('.')[0]}_{group_name}_checklog.txt"
 
-    parse_m3u8_file(args.playlist, args.group, args.timeout, log_file_name, extended_timeout=args.extended, split=args.split, rename=args.rename)
+    parse_m3u8_file(args.playlist, args.group, args.timeout, log_file_name, extended_timeout=args.extended, split=args.split, rename=args.rename, skip_screenshots=args.skip_screenshots, output_file=args.output)
 
 if __name__ == "__main__":
     main()

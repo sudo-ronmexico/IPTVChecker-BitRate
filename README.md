@@ -52,10 +52,12 @@ python IPTV_checker.py /path/to/your/playlist.m3u8
 ### Options
 
 - **`-group` or `-g`**: Specify a group title to check within the playlist.
+- **`-output` or `-o`**: Output file path e.g. ~/output/results.csv.
 - **`-timeout` or `-t`**: Set a timeout in seconds for checking the channel status.
 - **`-extended` or `-e [seconds]`**: Enable an extended timeout check for channels detected as dead. If specified without a value, defaults to 10 seconds. This option allows you to retry dead channels with a longer timeout.
 - **`-split` or `-s`**: Create separate playlists for working and dead channels.
 - **`-rename` or `-r`**: Rename alive channels to include video and audio information in the playlist.
+- **`-skip_screenshots`**: Skip capturing screenshots.
 - **`-v`**: Increase output verbosity to `INFO` level.
 - **`-vv`**: Increase output verbosity to `DEBUG` level.
 
