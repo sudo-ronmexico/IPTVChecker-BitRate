@@ -318,7 +318,11 @@ def file_log_entry(f_output, current_channel, total_channels, channel_name, stat
     f_output.write(f"{current_channel},{total_channels},{status},\"{channel_name}\",{codec_name},{video_bitrate},{resolution},{fps},{audio_info}\n")
     logging.debug(f"{current_channel}|{total_channels}|{status}|{channel_name}|{codec_name}|{video_bitrate}|{resolution}|{fps}|{audio_info}")
 
-    
+
+def is_line_needed(line, group_title, pattern):
+    return line.startswith('#EXTINF') and (group_title in line if group_title else True) and (pattern.search(get_channel_name(line)) if pattern else True)
+
+
 def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout, split=False, rename=False, skip_screenshots=False, output_file=None, channel_search=None):
     base_playlist_name = os.path.basename(file_path).split('.')[0]
     group_name = group_title.replace('|', '').replace(' ', '') if group_title else 'AllGroups'
@@ -344,47 +348,43 @@ def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout,
 
     working_channels = []
     dead_channels = []
+    
+    pattern = None
 
     # Get console width
     console_width = shutil.get_terminal_size((80, 20)).columns
 
     try:
+        logging.info(f"Loading channels from {file_path} with group '{group_title}' and search '{channel_search if channel_search else 'No Search'}'...")
+                
+        if channel_search:
+            pattern = re.compile(channel_search, flags=re.IGNORECASE)
+        
         with open(file_path, 'r', encoding='utf-8') as file:
-            lines = file.readlines()
-            total_channels = sum(1 for line in lines if line.startswith('#EXTINF') and (group_title in line if group_title else True))
+            lines = [line.strip() for line in file.readlines()]
+            channels = [line for line in lines if is_line_needed(line, group_title, pattern)]
+            total_channels = len(channels)
 
-            logging.info(f"Loading channels from {file_path} with group '{group_title}'...")
-            logging.info(f"Total channels matching group '{group_title}': {total_channels}\n")
-
+            logging.info(f"Total channels matching selection: {total_channels}\n")
+            
             # Calculate the maximum channel name length and check if the formatted line will fit in the console width
-            for i in range(len(lines)):
-                line = lines[i].strip()
-                if line.startswith('#EXTINF') and (group_title in line if group_title else True):
-                    if i + 1 < len(lines):
-                        channel_name = line.split(',', 1)[1].strip() if ',' in line else "Unknown Channel"
-                        max_name_length = max(max_name_length, len(channel_name))
+            for channel in channels:
+                channel_name = get_channel_name(channel)
+                max_name_length = max(max_name_length, len(channel_name))
+                logging.info(f"will process :   {channel_name}")
 
             # Estimate if the line will fit in the console width
-            max_line_length = max_name_length + len("1/5 ✓ | Video: 1080p50 H264 - Audio: 160 kbps AAC") + 3  # 3 for extra padding
-            if max_line_length > console_width:
-                use_padding = False
-            else:
-                use_padding = True
-
-            pattern = None
-            if channel_search:
-                pattern = re.compile(channel_search, flags=re.IGNORECASE)
-            else:
-                pattern = re.compile(".*", flags=re.DOTALL)
-
+            max_line_length = max_name_length + len("1/5 ✓ | Video: 1080p50 H264 - Audio: 160 kbps AAC") + 3  # 3 for extra padding            
+            use_padding = (max_line_length <= console_width)
+           
             renamed_lines = []
             i = 0
             while i < len(lines):
-                line = lines[i].strip()
-                if line.startswith('#EXTINF') and (group_title in line if group_title else True) and (pattern.search(channel_name) if not pattern else True):
+                line = lines[i]
+                if is_line_needed(line, group_title, pattern):
                     if i + 1 < len(lines):
-                        next_line = lines[i + 1].strip()
-                        channel_name = line.split(',', 1)[1].strip() if ',' in line else "Unknown Channel"
+                        next_line = lines[i + 1]
+                        channel_name = get_channel_name(line)
                         identifier = f"{channel_name} {next_line}"
                         if identifier not in processed_channels:
                             current_channel += 1
@@ -485,6 +485,9 @@ def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout,
         logging.error(f"File not found: {file_path}. Please check the path and try again.")
     except Exception as e:
         logging.error(f"An unexpected error occurred while processing the file: {str(e)}")
+
+def get_channel_name(line):
+    return line.split(',', 1)[1].strip() if ',' in line else "Unknown Channel"
 
 def main():
     print_header()
