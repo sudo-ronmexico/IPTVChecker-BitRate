@@ -485,7 +485,7 @@ def main():
     parser = argparse.ArgumentParser(description="Check the status of channels in an IPTV M3U8 playlist and capture frames of live channels.")
     parser.add_argument("playlist", type=str, help="Path to the M3U8 playlist file")
     parser.add_argument("-group", "-g", type=str, default=None, help="Specific group title to check within the playlist")
-    parser.add_argument("-output", "-o", type=str, default=None, help="Output file path e.g. ~/output/groupname.csv")
+    parser.add_argument("-output", "-o", type=str, default=None, help="Output file path e.g. ~/output/results.csv")
     parser.add_argument("-timeout", "-t", type=float, default=10.0, help="Timeout in seconds for checking channel status")
     parser.add_argument("-v", action="count", default=0, help="Increase output verbosity (-v for info, -vv for debug)")
     parser.add_argument("-extended", "-e", type=int, nargs='?', const=10, default=None, help="Enable extended timeout check for dead channels. Default is 10 seconds if used without specifying time.")
