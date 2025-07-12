@@ -487,7 +487,7 @@ def parse_m3u8_file(file_path, group_title, timeout, log_file, extended_timeout,
         logging.error(f"An unexpected error occurred while processing the file: {str(e)}")
 
 def get_channel_name(line):
-    return line.split(',', 1)[1].strip() if ',' in line else "Unknown Channel"
+    return line.rsplit(',', 1)[1].strip() if ',' in line else "Unknown Channel"
 
 def main():
     print_header()
