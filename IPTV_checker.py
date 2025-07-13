@@ -296,14 +296,16 @@ def console_log_entry(playlist_file,current_channel, total_channels, channel_nam
             logging.debug(f"{playlist_file}| {current_channel}/{total_channels} {status_symbol} {channel_name}")
 
 
-def file_log_entry(f_output, playlist_file,current_channel, total_channels, channel_name, status, codec_name, video_bitrate, resolution, fps, audio_info):
-    f_output.write(f"{playlist_file},{current_channel},{total_channels},{status},\"{channel_name}\",{codec_name},{video_bitrate},{resolution},{fps},{audio_info}\n")
-    logging.debug(f"{playlist_file},{current_channel}|{total_channels}|{status}|{channel_name}|{codec_name}|{video_bitrate}|{resolution}|{fps}|{audio_info}")
+def file_log_entry(f_output, playlist_file,current_channel, total_channels, channel_name, channel_id, status, codec_name, video_bitrate, resolution, fps, audio_info):
+    f_output.write(f"{playlist_file},{current_channel},{total_channels},{status},\"{channel_name}\",{channel_id},{codec_name},{video_bitrate},{resolution},{fps},{audio_info}\n")
+    logging.debug(f"{playlist_file},{current_channel}|{total_channels}|{channel_id}|{status}|{channel_name}|{codec_name}|{video_bitrate}|{resolution}|{fps}|{audio_info}")
 
 
 def is_line_needed(line, group_title, pattern):
     return line.startswith('#EXTINF') and (group_title in line if group_title else True) and (pattern.search(get_channel_name(line)) if pattern else True)
 
+def get_channel_id(next_line):
+    return next_line.rsplit('''/''',1)[1].replace('''.ts''','') if '''/''' in next_line else 0
 
 def parse_m3u8_file(playlists, group_title, timeout, extended_timeout, split=False, rename=False, skip_screenshots=False, output_file=None, channel_search=None):
     base_playlist_name = os.path.basename(playlists[0]).split('.')[0]
@@ -319,7 +321,7 @@ def parse_m3u8_file(playlists, group_title, timeout, extended_timeout, split=Fal
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
         logging.info(f"will output results to {output_file}")        
         f_output = codecs.open(output_file, "w", "utf-8-sig")  
-        f_output.write("Playlist,Number,Total,Status,Name,Codec,Bit Rate,Resolution,Frame Rate,Audio\n")      
+        f_output.write("Playlist,Number,Total,ID,Status,Name,Codec,Bit Rate,Resolution,Frame Rate,Audio\n")      
 
     current_channel = 0
     mislabeled_channels = []
@@ -378,6 +380,7 @@ def parse_m3u8_file(playlists, group_title, timeout, extended_timeout, split=Fal
                                 codec_name, video_bitrate, resolution, fps = get_detailed_stream_info(next_line)
                                 video_info, resolution, fps = get_stream_info(codec_name, video_bitrate, resolution, fps)
                                 audio_info = get_audio_bitrate(next_line)
+                                channel_id = get_channel_id(next_line)
                                 mismatches = check_label_mismatch(channel_name, resolution)
                                 if fps is not None and fps <= 30:
                                     low_framerate_channels.append(f"{current_channel}/{total_channels} {channel_name} - \033[91m{fps}fps\033[0m")
@@ -404,7 +407,7 @@ def parse_m3u8_file(playlists, group_title, timeout, extended_timeout, split=Fal
                             
                             # Ensure it only prints the channel info once per loop
                             if output_file:
-                                file_log_entry(f_output, playlist_file,current_channel, total_channels, channel_name, status, codec_name, video_bitrate, resolution, fps, audio_info)
+                                file_log_entry(f_output, playlist_file,current_channel, total_channels, channel_name, channel_id, status, codec_name, video_bitrate, resolution, fps, audio_info)
                             console_log_entry(playlist_file,current_channel, total_channels, channel_name, status, video_info, audio_info, max_name_length, use_padding)
 
                             # Add the processed (renamed) line and the corresponding URL to the list
