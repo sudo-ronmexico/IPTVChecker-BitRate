@@ -296,9 +296,9 @@ def console_log_entry(playlist_file,current_channel, total_channels, channel_nam
             logging.debug(f"{playlist_file}| {current_channel}/{total_channels} {status_symbol} {channel_name}")
 
 
-def file_log_entry(f_output, playlist_file,current_channel, total_channels, channel_name, channel_id, status, codec_name, video_bitrate, resolution, fps, audio_info):
-    f_output.write(f"{playlist_file},{current_channel},{total_channels},{status},\"{channel_name}\",{channel_id},{codec_name},{video_bitrate},{resolution},{fps},{audio_info}\n")
-    logging.debug(f"{playlist_file},{current_channel}|{total_channels}|{channel_id}|{status}|{channel_name}|{codec_name}|{video_bitrate}|{resolution}|{fps}|{audio_info}")
+def file_log_entry(f_output, playlist_file,current_channel, total_channels, group_name, channel_name, channel_id, status, codec_name, video_bitrate, resolution, fps, audio_info):
+    f_output.write(f"{playlist_file},{current_channel},{total_channels},{status},\"{group_name}\",\"{channel_name}\",{channel_id},{codec_name},{video_bitrate.replace("kbps","")},{resolution},{fps},{audio_info}\n")
+    logging.debug(f"{playlist_file},{current_channel}|{total_channels}|{channel_id}|{status}|{group_name}|{channel_name}|{codec_name}|{video_bitrate}|{resolution}|{fps}|{audio_info}")
 
 
 def is_line_needed(line, group_title, pattern):
@@ -306,6 +306,13 @@ def is_line_needed(line, group_title, pattern):
 
 def get_channel_id(next_line):
     return next_line.rsplit('''/''',1)[1].replace('''.ts''','') if '''/''' in next_line else 0
+
+def get_group_name(line):
+    if "group-title=" in line:
+        s = str(line).split("group-title=")[1].replace("\"","")
+        if "," in s:
+            return s.split(",")[0]
+    return "Unknown Group"
 
 def parse_m3u8_file(playlists, group_title, timeout, extended_timeout, split=False, rename=False, skip_screenshots=False, output_file=None, channel_search=None):
     base_playlist_name = os.path.basename(playlists[0]).split('.')[0]
@@ -321,7 +328,7 @@ def parse_m3u8_file(playlists, group_title, timeout, extended_timeout, split=Fal
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
         logging.info(f"will output results to {output_file}")        
         f_output = codecs.open(output_file, "w", "utf-8-sig")  
-        f_output.write("Playlist,Number,Total,ID,Status,Name,Codec,Bit Rate,Resolution,Frame Rate,Audio\n")      
+        f_output.write("Playlist,Channel Number,Total Channels in Playlist,Group Name,Channel Status,Channel Name,Channel ID,Codec,Bit Rate (kbps),Resolution,Frame Rate,Audio\n")      
 
     current_channel = 0
     mislabeled_channels = []
@@ -381,6 +388,7 @@ def parse_m3u8_file(playlists, group_title, timeout, extended_timeout, split=Fal
                                 video_info, resolution, fps = get_stream_info(codec_name, video_bitrate, resolution, fps)
                                 audio_info = get_audio_bitrate(next_line)
                                 channel_id = get_channel_id(next_line)
+                                group_name = get_group_name(line)
                                 mismatches = check_label_mismatch(channel_name, resolution)
                                 if fps is not None and fps <= 30:
                                     low_framerate_channels.append(f"{current_channel}/{total_channels} {channel_name} - \033[91m{fps}fps\033[0m")
@@ -407,7 +415,8 @@ def parse_m3u8_file(playlists, group_title, timeout, extended_timeout, split=Fal
                             
                             # Ensure it only prints the channel info once per loop
                             if output_file:
-                                file_log_entry(f_output, playlist_file,current_channel, total_channels, channel_name, channel_id, status, codec_name, video_bitrate, resolution, fps, audio_info)
+                                file_log_entry(f_output, playlist_file,current_channel, total_channels, group_name, channel_name, channel_id, status, codec_name, video_bitrate, resolution, fps, audio_info)
+                            
                             console_log_entry(playlist_file,current_channel, total_channels, channel_name, status, video_info, audio_info, max_name_length, use_padding)
 
                             # Add the processed (renamed) line and the corresponding URL to the list
@@ -430,48 +439,60 @@ def parse_m3u8_file(playlists, group_title, timeout, extended_timeout, split=Fal
         
 
         if split:
-            working_playlist_path = f"{base_playlist_name}_working.m3u8"
-            dead_playlist_path = f"{base_playlist_name}_dead.m3u8"
-            with open(working_playlist_path, 'w', encoding='utf-8') as working_file:
-                working_file.write("#EXTM3U\n")
-                for entry in working_channels:
-                    working_file.write(entry[0] + "\n")
-                    working_file.write(entry[1] + "\n")
-            with open(dead_playlist_path, 'w', encoding='utf-8') as dead_file:
-                dead_file.write("#EXTM3U\n")
-                for entry in dead_channels:
-                    dead_file.write(entry[0] + "\n")
-                    dead_file.write(entry[1] + "\n")
-            logging.info(f"Working channels playlist saved to {working_playlist_path}")
-            logging.info(f"Dead channels playlist saved to {dead_playlist_path}")
+            handle_split(base_playlist_name, working_channels, dead_channels)
         elif rename:  # Save the renamed playlist directly if split is not enabled
-            renamed_playlist_path = f"{base_playlist_name}_renamed.m3u8"
-            with open(renamed_playlist_path, 'w', encoding='utf-8') as renamed_file:
-                renamed_file.write("#EXTM3U\n")
-                for line in renamed_lines:
-                    renamed_file.write(line + "\n")
-            logging.info(f"Renamed playlist saved to {renamed_playlist_path}")
+            handle_rename(base_playlist_name, renamed_lines)
 
         if low_framerate_channels:
-            print("\n\033[93mLow Framerate Channels:\033[0m")
-            for entry in low_framerate_channels:
-                print(f"{entry}")
-            logging.info("Low Framerate Channels Detected:")
-            for entry in low_framerate_channels:
-                logging.info(entry)
+            print_low_framerate(low_framerate_channels)
 
         if mislabeled_channels:
-            print("\n\033[93mMislabeled Channels:\033[0m")
-            for entry in mislabeled_channels:
-                print(f"{entry}")
-            logging.info("Mislabeled Channels Detected:")
-            for entry in mislabeled_channels:
-                logging.info(entry)
+            print_mislabeled(mislabeled_channels)
 
     except FileNotFoundError:
         logging.error(f"File not found: {file_path}. Please check the path and try again.")
     except Exception as e:
         logging.error(f"An unexpected error occurred while processing the file: {str(e)}")
+
+def print_mislabeled(mislabeled_channels):
+    print("\n\033[93mMislabeled Channels:\033[0m")
+    for entry in mislabeled_channels:
+        print(f"{entry}")
+    logging.info("Mislabeled Channels Detected:")
+    for entry in mislabeled_channels:
+        logging.info(entry)
+
+def print_low_framerate(low_framerate_channels):
+    print("\n\033[93mLow Framerate Channels:\033[0m")
+    for entry in low_framerate_channels:
+        print(f"{entry}")
+    logging.info("Low Framerate Channels Detected:")
+    for entry in low_framerate_channels:
+        logging.info(entry)
+
+def handle_rename(base_playlist_name, renamed_lines):
+    renamed_playlist_path = f"{base_playlist_name}_renamed.m3u8"
+    with open(renamed_playlist_path, 'w', encoding='utf-8') as renamed_file:
+        renamed_file.write("#EXTM3U\n")
+        for line in renamed_lines:
+            renamed_file.write(line + "\n")
+    logging.info(f"Renamed playlist saved to {renamed_playlist_path}")
+
+def handle_split(base_playlist_name, working_channels, dead_channels):
+    working_playlist_path = f"{base_playlist_name}_working.m3u8"
+    dead_playlist_path = f"{base_playlist_name}_dead.m3u8"
+    with open(working_playlist_path, 'w', encoding='utf-8') as working_file:
+        working_file.write("#EXTM3U\n")
+        for entry in working_channels:
+            working_file.write(entry[0] + "\n")
+            working_file.write(entry[1] + "\n")
+    with open(dead_playlist_path, 'w', encoding='utf-8') as dead_file:
+        dead_file.write("#EXTM3U\n")
+        for entry in dead_channels:
+            dead_file.write(entry[0] + "\n")
+            dead_file.write(entry[1] + "\n")
+    logging.info(f"Working channels playlist saved to {working_playlist_path}")
+    logging.info(f"Dead channels playlist saved to {dead_playlist_path}")
 
 def get_channel_name(line):
     return line.rsplit(',', 1)[1].strip() if ',' in line else "Unknown Channel"

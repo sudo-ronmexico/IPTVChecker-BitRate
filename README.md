@@ -102,7 +102,7 @@ python IPTV_checker.py /path/to/your/playlist.m3u8
 
 8. **Check with Channel name search**:
    ```bash
-   python IPTV_checker.py /path/to/your/playlist.m3u8 -c "Sky Sports"
+   python IPTV_checker.py /path/to/your/playlist.m3u8 -c "Sky Sports|TNT Sports"
    ```
    
 ### Output Format
