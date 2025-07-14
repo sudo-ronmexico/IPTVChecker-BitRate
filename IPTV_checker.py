@@ -328,7 +328,7 @@ def parse_m3u8_file(playlists, group_title, timeout, extended_timeout, split=Fal
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
         logging.info(f"will output results to {output_file}")        
         f_output = codecs.open(output_file, "w", "utf-8-sig")  
-        f_output.write("Playlist,Channel Number,Total Channels in Playlist,Group Name,Channel Status,Channel Name,Channel ID,Codec,Bit Rate (kbps),Resolution,Frame Rate,Audio\n")      
+        f_output.write("Playlist,Channel Number,Total Channels in Playlist,Channel Status,Group Name,Channel Name,Channel ID,Codec,Bit Rate (kbps),Resolution,Frame Rate,Audio\n")      
 
     current_channel = 0
     mislabeled_channels = []
