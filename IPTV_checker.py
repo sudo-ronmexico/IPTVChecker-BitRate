@@ -382,6 +382,12 @@ def parse_m3u8_file(playlists, group_title, timeout, extended_timeout, split=Fal
                             status = check_channel_status(next_line, timeout, extended_timeout=extended_timeout)
                             video_info = "Unknown"
                             audio_info = "Unknown"
+                            codec_name = "Unknown"
+                            video_bitrate = "Unknown"
+                            resolution = "Unknown"
+                            audio_info = "Unknown"
+                            channel_id = "Unknown"
+                            group_name = "Unknown"
                             fps = None
                             if status == 'Alive':
                                 codec_name, video_bitrate, resolution, fps = get_detailed_stream_info(next_line)
