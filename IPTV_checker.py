@@ -297,7 +297,8 @@ def console_log_entry(playlist_file,current_channel, total_channels, channel_nam
 
 
 def file_log_entry(f_output, playlist_file,current_channel, total_channels, group_name, channel_name, channel_id, status, codec_name, video_bitrate, resolution, fps, audio_info):
-    f_output.write(f"{playlist_file},{current_channel},{total_channels},{status},\"{group_name}\",\"{channel_name}\",{channel_id},{codec_name},{video_bitrate.replace("kbps","")},{resolution},{fps},{audio_info}\n")
+    #f_output.write(f"{playlist_file},{current_channel},{total_channels},{status},\"{group_name}\",\"{channel_name}\",{channel_id},{codec_name},{video_bitrate.replace("kbps","")},{resolution},{fps},{audio_info}\n")
+    f_output.write(f"{playlist_file},{current_channel},{total_channels},{status},\"{group_name}\",\"{channel_name}\",{channel_id},{codec_name},{video_bitrate.replace('kbps','')},{resolution},{fps},{audio_info}\n")
     logging.debug(f"{playlist_file},{current_channel}|{total_channels}|{channel_id}|{status}|{group_name}|{channel_name}|{codec_name}|{video_bitrate}|{resolution}|{fps}|{audio_info}")
 
 
