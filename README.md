@@ -14,6 +14,7 @@ IPTV Stream Checker is a command-line tool originally by <a href="https://github
 - **Split Playlist:** Split into separate playlists for working and dead channels.
 - **Capture Screenshots:** Capture screenshots from live streams.
 - **Group Filter:** Option to check specific groups within the M3U8 playlist.
+- **Channel Name Filter:** Option to check specific channels within the M3U8 playlist based on their name.
 - **Detailed Stream Info:** Retrieve and display video codec, resolution, framerate, and audio bitrate.
 - **Low Framerate Detection:** Identifies and lists channels with framerates at 30fps or below.
 - **Mislabeled Channel Detection:** Detects channels with resolutions that do not match their labels (e.g., "1080p" labeled as "4K").
@@ -52,6 +53,7 @@ python IPTV_checker.py /path/to/your/playlist.m3u8
 ### Options
 
 - **`-group` or `-g`**: Specify a group title to check within the playlist.
+- **`-channel_search` or `-c`**: Specify a search term for channel names. Based on https://docs.python.org/3/library/re.html#re.search syntax. Case Insensitive. 
 - **`-output` or `-o`**: Output file path e.g. ~/output/results.csv.
 - **`-timeout` or `-t`**: Set a timeout in seconds for checking the channel status.
 - **`-extended` or `-e [seconds]`**: Enable an extended timeout check for channels detected as dead. If specified without a value, defaults to 10 seconds. This option allows you to retry dead channels with a longer timeout.
@@ -96,6 +98,11 @@ python IPTV_checker.py /path/to/your/playlist.m3u8
 7. **Enable Debug Mode for Detailed Output**:
    ```bash
    python IPTV_checker.py /path/to/your/playlist.m3u8 -vv
+   ```
+
+8. **Check with Channel name search**:
+   ```bash
+   python IPTV_checker.py /path/to/your/playlist.m3u8 -c "Sky Sports|TNT Sports"
    ```
    
 ### Output Format
